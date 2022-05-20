@@ -7,7 +7,24 @@ class DropBoxController {
     this.nameFileEl = this.snackModalEl.querySelector('.filename')
     this.timeleftEl = this.snackModalEl.querySelector('.timeleft')
 
+    this.connectFireBase()  
+    
     this.initEvents();
+  }
+    connectFireBase(){
+      const config = {
+        apiKey: "AIzaSyABfqVrxA1O3k2s-CW46OWN5fJVoSZe3Gc",
+        authDomain: "dropbox-clone-65731.firebaseapp.com",
+        databaseURL: "https://dropbox-clone-65731-default-rtdb.firebaseio.com",
+        projectId: "dropbox-clone-65731",
+        storageBucket: "dropbox-clone-65731.appspot.com",
+        messagingSenderId: "571700525099",
+        appId: "1:571700525099:web:91f31c13e1fe561469d26e",
+        measurementId: "G-RMX16SV1XR"
+      };
+      
+      firebase.initializeApp(config);
+
   }
 
   initEvents() {
@@ -16,13 +33,33 @@ class DropBoxController {
     });
 
     this.inputFilesEl.addEventListener("change", (event) => {
-      this.uploadTask(event.target.files);
+      this.btnSendFileEl.disabled = true
+      this.uploadTask(event.target.files).then(responses => {
+        responses.forEach(resp => {
+
+          this.getFirebaseRef().push().set(resp.files['input-file'])
+        })
+
+        this.uploadComplete()
+
+      }).catch(err => {
+        this.uploadComplete()
+        console.error(err)
+      })
 
       this.modalShow();
 
-      this.inputFilesEl.value = "";
-
     });
+  }
+
+  uploadComplete() {
+    this.modalShow(false)
+    this.inputFilesEl.value = "";
+    this.btnSendFileEl.disabled = false
+  }   
+
+  getFirebaseRef() {
+    return firebase.database().ref('files')
   }
 
   modalShow(show = true) {
@@ -40,8 +77,6 @@ class DropBoxController {
 
         ajax.onload = event => {
 
-          this.modalShow(false)
-
           try {
             resolve(JSON.parse(ajax.responseText))
           } catch (e) {
@@ -50,7 +85,6 @@ class DropBoxController {
         }
 
         ajax.onerror = event => {
-          this.modalShow(false)
           reject(event)
         }
 
@@ -278,4 +312,12 @@ class DropBoxController {
       </li>
     `
   }
+  ReadFiles(){
+
+    this.getFirebaseRef().on('value', snapshot => {
+
+      
+    })
+  }
+
 }
