@@ -1,5 +1,7 @@
 class DropBoxController {
   constructor() {
+
+    this.onselectionchange = new Event ('selectionchange');
     this.btnSendFileEl = document.querySelector("#btn-send-file");
     this.inputFilesEl = document.querySelector("#files");
     this.snackModalEl = document.querySelector("#react-snackbar-root");
@@ -7,6 +9,10 @@ class DropBoxController {
     this.nameFileEl = this.snackModalEl.querySelector('.filename')
     this.timeleftEl = this.snackModalEl.querySelector('.timeleft')
     this.listFilesEl = document.querySelector('#list-of-files-and-directories')
+
+    this.btnNewFolder = document.querySelector('#btn-new-folder');
+    this.btnRename = document.querySelector('#btn-rename')
+    this.btnDelete = document.querySelector('#btn-delete')
 
     this.connectFireBase()  
     
@@ -30,9 +36,41 @@ class DropBoxController {
 
   }
 
+  getSelection() {
+
+    return this.listFilesEl.querySelectorAll('.selected')
+  }
+
   initEvents() {
-    this.btnSendFileEl.addEventListener("click", (event) => {
-      this.inputFilesEl.click();
+    this.listFilesEl.addEventListener('selectionchange', e => {
+
+      console.log('selectionchange', this.getSelection().length);
+      switch (this.getSelection().length) {
+
+        case 0:
+
+        this.btnDelete.style.display = 'none';
+        this.btnRename.style.display = 'none';
+
+        break;
+
+        case 1:
+
+          this.btnDelete.style.display = 'block';
+          this.btnRename.style.display = 'block';
+          console.log("asd")
+  
+        
+        break;
+
+        default:
+
+          this.btnDelete.style.display = 'block';
+          this.btnRename.style.display = 'none';
+
+        break;
+
+      }
     });
 
     this.inputFilesEl.addEventListener("change", (event) => {
@@ -349,33 +387,29 @@ initEventsLi(li){
     if (e.shiftKey) {
 
      let firstLi = this.listFilesEl.querySelector('.selected');  
-
      if (firstLi) {
-
       let indexStart;
       let indexEnd;
       let lis = li.parentElement.childNodes;
 
-      if (firstLi === el) indexStart = index;
-      if (li === el) indexEnd = index;
+      lis.forEach((el, index) => {
+        if (firstLi === el) indexStart = index;
+        if (li === el) indexEnd = index;
+      })
+      
+      let index = [indexStart, indexEnd].sort()
 
+      lis.forEach((el, i) => {
+        if (i >= index[0] && i <= index[1]) {
+          el.classList.add('selected')
+        }
+      })
 
-     let index = [indexStart, indexEnd].sort();
-     
-     lis.forEach((el, i) => {
-
-
-      if(i >= index[0] && i <= index[1]) {
-
-
-        el.classList.add('selected')
-      }
-    })
+      this.listFilesEl.dispatchEvent(this.onselectionchange);
 
       return true;
-       
-        }
-        }
+    }
+  }
 
         if (!e.crtlKey) {
 
@@ -387,6 +421,9 @@ initEventsLi(li){
 
           })
         }
+        li.classList.toggle('selected')
+
+        this.listFilesEl.dispatchEvent(this.onselectionchange);
       })
 
 
