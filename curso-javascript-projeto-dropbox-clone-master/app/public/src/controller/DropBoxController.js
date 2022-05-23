@@ -1,6 +1,8 @@
 class DropBoxController {
   constructor() {
 
+    this.currentFolder = ['breno']
+
     this.onselectionchange = new Event ('selectionchange');
     this.btnSendFileEl = document.querySelector("#btn-send-file");
     this.inputFilesEl = document.querySelector("#files");
@@ -37,133 +39,191 @@ class DropBoxController {
   }
 
   getSelection() {
+    return this.listFilesEl.querySelectorAll(".selected");
+  }
 
-    return this.listFilesEl.querySelectorAll('.selected')
+  removeTask() {
+    let promises = [];
+
+    this.getSelection().forEach((li) => {
+      let file = JSON.parse(li.dataset.file);
+      let key = li.dataset.key;
+
+      let formData = new FormData()
+
+      formData.append('path', file.path);
+      formData.append('key', key);
+
+      promises.push(this.ajax('/file', 'DELETE', formData));
+
+    });
+    
+    return Promise.all(promises);
   }
 
   initEvents() {
 
-    this.btnRename.addEventListener('click', e=> {
+    this.btnNewFolder.addEventListener('click', e => {
 
-      let li = this.getSelection()[0];
-
-      let file = JSON.parse(li.dataset.file);
-
-
-      let name = prompt("Renomear o arquivo: ", file.name);
+      let name = prompt("Nome da nova pasta: ")
 
       if (name) {
 
-        file.originalFilename = name;
+        this.getFirebaseRef().push().set({
 
-        this.getFirebaseRef().child(li.dataset.key).set(file)
+          name,
+          type: 'folder',
+          path:  this.currentFolder.join('/')
+        })
       }
     })
-    this.listFilesEl.addEventListener('selectionchange', e => {
 
-      console.log('selectionchange', this.getSelection().length);
-      switch (this.getSelection().length) {
+    this.btnDelete.addEventListener("click", (e) => {
+      this.removeTask()
+        .then((responses) => {
 
-        case 0:
+          responses.forEach(response => {
+            if (response.fields.key) {
+              this.getFirebaseRef().child
+              (response.fields.key).remove();
+            }
+          })
 
-        this.btnDelete.style.display = 'none';
-        this.btnRename.style.display = 'none';
+          console.log("responses");
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    });
 
-        break;
+    this.btnRename.addEventListener("click", (e) => {
 
-        case 1:
+      let li = this.getSelection()[0];
+      let file = JSON.parse(li.dataset.file);
 
-          this.btnDelete.style.display = 'block';
-          this.btnRename.style.display = 'block';
-          console.log("asd")
-  
-        
-        break;
+      let name = prompt("Renomar o arquivo:", file.name);
 
-        default:
+      if (name) {
+        file.name = name;
 
-          this.btnDelete.style.display = 'block';
-          this.btnRename.style.display = 'none';
-
-        break;
-
+        this.getFirebaseRef().child(li.dataset.key).set(file);
       }
     });
 
+    this.listFilesEl.addEventListener("selectionchange", (e) => {
+      switch (this.getSelection().length) {
+        case 0:
+          this.btnDelete.style.display = "none";
+          this.btnRename.style.display = "none";
+          break;
+
+        case 1:
+          this.btnDelete.style.display = "block";
+          this.btnRename.style.display = "block";
+          break;
+
+        default:
+          this.btnDelete.style.display = "block";
+          this.btnRename.style.display = "none";
+      }
+    });
+
+    this.btnSendFileEl.addEventListener("click", (event) => {
+      this.inputFilesEl.click();
+    });
+
     this.inputFilesEl.addEventListener("change", (event) => {
-      this.btnSendFileEl.disabled = true
-      this.uploadTask(event.target.files).then(responses => {
-        responses.forEach(resp => {
+      this.btnSendFileEl.disabled = true;
+      this.uploadTask(event.target.files)
+        .then((responses) => {
+          responses.forEach((resp) => {
+            this.getFirebaseRef().push().set(resp.files["input-file"]);
+          });
 
-          this.getFirebaseRef().push().set(resp.files['input-file'])
+          this.uploadComplete();
         })
-
-        this.uploadComplete()
-
-      }).catch(err => {
-        this.uploadComplete()
-        console.error(err)
-      })
+        .catch((err) => {
+          this.uploadComplete();
+          console.error(err);
+        });
 
       this.modalShow();
-
     });
   }
 
   uploadComplete() {
-    this.modalShow(false)
+    this.modalShow(false);
     this.inputFilesEl.value = "";
-    this.btnSendFileEl.disabled = false
-  }   
+    this.btnSendFileEl.disabled = false;
+  }
 
   getFirebaseRef() {
-    return firebase.database().ref('files')
+    return firebase.database().ref("files");
   }
 
   modalShow(show = true) {
-    this.snackModalEl.style.display = (show) ? "block" : "none"
+    this.snackModalEl.style.display = show ? "block" : "none";
   }
+
+  ajax(
+    url,
+    method = "GET",
+    formData = new FormData(),
+    onprogress = function () {},
+    onloadstart = function () {}
+  ) {
+    return new Promise((resolve, reject) => {
+      let ajax = new XMLHttpRequest();
+
+      ajax.open(method, url);
+
+      ajax.onload = (event) => {
+        try {
+          resolve(JSON.parse(ajax.responseText));
+        } catch (e) {
+          reject(e);
+        }
+      };
+
+      ajax.onerror = (event) => {
+        reject(event);
+      };
+
+      ajax.upload.onprogress = onprogress;
+
+      onloadstart();
+
+      ajax.send(formData);
+    });
+  }
+
 
   uploadTask(files) {
     let promises = [];
 
-    [...files].forEach(file => {
-      promises.push(new Promise((resolve, reject) => {
-        let ajax = new XMLHttpRequest();
+    [...files].forEach((file) => {
+      let formData = new FormData();
 
-        ajax.open('POST', '/upload')
+      formData.append("input-file", file);
 
-        ajax.onload = event => {
-
-          try {
-            resolve(JSON.parse(ajax.responseText))
-          } catch (e) {
-            reject(e)
+      promises.push(
+        this.ajax(
+          "/upload",
+          "POST",
+          formData,
+          () => {
+            this.uploadProgress(event, file);
+          },
+          () => {
+            this.startUploadTime = Date.now();
           }
-        }
+        )
+      );
+    });
 
-        ajax.onerror = event => {
-          reject(event)
-        }
-
-        ajax.upload.onprogress = event => {
-          this.uploadProgress(event, file)
-        }
-
-        let formData = new FormData()
-
-        formData.append('input-file', file)
-
-        this.startUploadTime = Date.now();
-
-        ajax.send(formData)
-
-      }))
-    })
-
-    return Promise.all(promises)
+    return Promise.all(promises);
   }
-
+  
   uploadProgress(event, file) {
 
     let timespent = Date.now() - this.startUploadTime;
